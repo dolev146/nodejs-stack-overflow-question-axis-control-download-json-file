@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Axis Control</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<link rel="stylesheet" href="./dist/uPlot.min.css" />
+	</head>
+	<body>
+		<script src="./dist/uPlot.iife.js"></script>
+		<div
+			id="fps"
+			style="position: fixed; top: 0; left: 500px; z-index: 1"
+		></div>
+		<button id="Start_btn" onclick="StartPress()">Start</button>
+		<button id="Stop_btn" onclick="StopPress()">Stop</button>
+		<div id="timer" ></div>
+
+		<script>
+			
+			let startdivTimer = 0;
+			let divtimer = document.getElementById("timer");
+			divtimer.textContent = "0";
+			let fps = 0;
+			let lastLoop = new Date();
+			let fpsdiv = document.getElementById("fps");
+			var indx = 0;
+			let data = 0;
+			let numberOfNaN = 4 * 2200;
+			let numberOfGraphs = 1;
+			let u = [];
+			// init array named dataSpli with 2 arrays inside it with 220000 values each one
+			let dataSplit = 0;
+			dataSplit[0] = Array(220_000);
+			dataSplit[1] = Array(220_000);
+			let NaN_Pos = 0; //numberOfNaN;
+			const NumOfUpdate = 2200;
+			const Period = 100;
+			const Len = 220_000;
+			// functions defenitions
+
+			const getData = async () => {
+				console.time("fetch");
+				const Jdata = await fetch("./DataMat.json");
+				const packed = await Jdata.json();
+				return packed;
+			};
+
+			const PrepFirst = async () => {
+				let dataj = [Array(Len), Array(Len)];
+
+				for (let i = 0; i < Len; i++) {
+					dataj[0][i] = data[0][i];
+					dataj[1][i] = data[1][i];
+				}
+
+				// setting the first 4400 values to null
+				for (let i = 0; i < numberOfNaN; i++) {
+					dataj[1][i] = null;
+				}
+				dataSplit = dataj;
+			};
+
+			// https://stackoverflow.com/questions/48254716/javascript-setinterval-with-passed-function-does-not-recognize-global-variable
+
+			const UpdateData = (CurrData) => {
+				// update the divtimer with the current time in ms since the start of the program
+				divtimer.textContent = Date.now() - startdivTimer;
+
+				console.time("prep");
+
+				//let dataj = dataSplit; //[Array(Len), Array(Len)];
+				if (NaN_Pos + NumOfUpdate > Len) {
+					NaN_Pos = 0;
+				}
+				for (let i = NaN_Pos; i < NaN_Pos + NumOfUpdate; i++) {
+					CurrData[1][i] = data[1][i];
+				}
+				console.timeEnd("prep");
+
+				// dataSpli =  dataj;
+				NaN_Pos += NumOfUpdate;
+				for (let i = NaN_Pos; i < NaN_Pos + numberOfNaN; i++) {
+					CurrData[1][i] = null;
+				}
+
+				return CurrData;
+			};
+
+			const StopPress = () => {
+				clearInterval(1);
+			};
+
+			// const StartPress = () => {
+			// 	startdivTimer = Date.now();
+			// 	setInterval(
+			// 		// i want to get the dataSpli array and update it with the new data
+
+			// 		() => {
+			// 			console.time("Draw");
+
+			// 			// const Len = 220_000;
+			// 			// //let dataj = dataSpli; //[Array(Len), Array(Len)];
+
+			// 			// for (let i = NaN_Pos; i < NaN_Pos + 2200; i++) {
+			// 			// 	// dataj[0][i] = packed[0][i];
+			// 			// 	dataSpli[1][i] = data[1][i + indx];
+			// 			// 	console.log(i);
+			// 			// }
+			// 			let CurrData = u[0].data;
+			// 			let newData = UpdateData(CurrData);
+			// 			// dataSplit = UpdateData();
+			// 			for (let i = 0; i < numberOfGraphs; i++) {
+			// 				u[i].setData(newData);
+			// 			}
+			// 			console.timeEnd("Draw");
+
+			// 			indx += NumOfUpdate;
+			// 			// so that we dont go out of the array
+			// 			if (indx > data[0].length - 2200) {
+			// 				indx = 0;
+			// 			}
+			// 		},
+			// 		Period,
+			// 		1
+			// 	);
+			// };
+
+			getData().then((packed) => {
+				data = packed;
+			});
+
+			// uPlot options
+
+			const opts = {
+				title: "Axis Control",
+				titleSize: 1,
+				width: 1050,
+				height: 100,
+				scales: {
+					x: {
+						time: false,
+						//	auto: false,
+						//	range: [0, 6],
+					},
+					y: {
+						auto: false,
+						range: [-120, 120],
+					},
+				},
+				series: [
+					{
+						// label: "x",
+						height: 1,
+					},
+					{
+						// label: "sin(x)",
+						stroke: "red",
+						// change the line width
+						width: 1,
+					},
+				],
+				axes: [
+					{
+						//	size: 30,
+						label: "X Axis Label",
+						labelSize: 1,
+					},
+					{
+						space: 50,
+						//	size: 40,
+						side: 1,
+						label: "Y Axis Label",
+						labelGap: 8,
+						labelSize: 8 + 12 + 8,
+						stroke: "red",
+					},
+				],
+			};
+
+			// drawing the chart
+
+			setTimeout(() => {
+				PrepFirst().then((dataj) => {
+					dataSplit = dataj;
+				});
+				for (let i = 0; i < numberOfGraphs; i++) {
+					u[i] = new uPlot(opts, dataSplit, document.body);
+				}
+				UpdateCharts();
+			}, 1000);
+
+			const UpdateCharts = () => {
+				let thisLoop = new Date();
+				let CurrData = u[0].data;
+				let newData = UpdateData(CurrData);
+				// dataSplit = UpdateData();
+				for (let i = 0; i < numberOfGraphs; i++) {
+					u[i].setData(newData);
+				}
+				fpsdiv.innerHTML = fps + " fps";
+				fps = 1000 / (thisLoop - lastLoop);
+				lastLoop = thisLoop;
+
+				indx += NumOfUpdate;
+				// so that we dont go out of the array
+				if (indx > data[0].length - 2200) {
+					indx = 0;
+				}
+				requestAnimationFrame(UpdateCharts);
+			};
+		</script>
+	</body>
+</html>
